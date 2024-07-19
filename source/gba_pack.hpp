@@ -9,37 +9,35 @@
 
 namespace GBS
 {
-	class GBAPack
-	{
-		typedef enum {
-			BgPalette,
+	class GBAPack {
+		enum EResourceType {
+			Palette,
 			TileSet,
 			TileMap,
-			SprPalette,
 			Sprite,
 			Script,
 			Scene,
 			Sound,
 
 			NumResourceTypes
-		} EResourceType;
+		};
 
-		typedef struct {
+		struct __attribute__((packed)) Header{
 			char signature[4];
-			uint16_t version;
-			uint32_t indexOffset;
-			uint32_t indexCount;
-		} __attribute__((packed)) FileHeader;
+			u16 version;
+			u32 indexOffset;
+			u32 indexCount;
+		};
 
 		typedef struct {
-			uint16_t type;
-			uint32_t dataOffset;
-			uint32_t dataSize;
+			u32 id;
+			u32 dataOffset;
+			u32 dataSize;
 		} __attribute__((packed)) IndexEntry;
 
 		struct IndexTableEntry {
 			EResourceType type;
-			u16 id;
+			u32 id;
 			const u8* data;
 			u32 size;
 		};
@@ -49,15 +47,14 @@ namespace GBS
 		};
 
 		struct __attribute__((packed)) TileSetHeader {
-			u16 colorMode;
+			u32 paletteId;
 			u16 numTiles;
-			u16 palette;
 		};
 
 		struct __attribute__((packed)) TileMapHeader {
+			u32 tileSetId;
 			u16 width;
 			u16 height;
-			u16 tileSet;
 		};
 
 		struct __attribute__((packed)) SpriteHeader {
@@ -66,16 +63,20 @@ namespace GBS
 		};
 
 	public:
-		GBAPack();
+		static GBAPack* getInstance();
 
-	public:
 		bool loadFromMemory(const u8* data, u32 size);
-		void getResourceData(u16 resourceId, const u8*& data, u32& dataSize);
+		void getResourceData(u32 resourceId, const u8*& data, u32& dataSize);
 
 	public:
 		void updateScrollAndLoadTiles(s16 newScrollX, s16 newScrollY);
 		void loadTilesVertical(u16 startX, u16 startY, u16 endY, bool rightEdge);
 		void loadTilesHorizontal(u16 startX, u16 endX, u16 startY, bool bottomEdge);
+
+	private:
+		GBAPack();
+
+		static GBAPack* instance;
 
 	private:
 		std::map<u32, IndexTableEntry> indexTable;

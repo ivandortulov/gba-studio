@@ -16,10 +16,15 @@
 
 #define GBRP_MAGIC 0x50524247
 
+#define RES_ID(Type, Count) \
+    ((Type) << 28) | ((Count) & 0x0FFFFFFF)
+
 namespace GBS {
-    const u8 TILE_SIZE = 8;
-    const u16 TYPE_MASK = 0xE000;
-    const u16 COUNT_MASK = 0x1FFF;
+    static const u8 TILE_SIZE = 8;
+    static const u32 TYPE_MASK = 0xF0000000; 
+    static const u32 COUNT_MASK = 0x0FFFFFFF;
+
+    GBAPack* GBAPack::instance = nullptr;
 
     static const char* const RES_TYPES[] = {
         "BgPalette",
@@ -40,16 +45,23 @@ namespace GBS {
         loadedTilesHeight = 20;
     }
 
+    GBAPack* GBAPack::getInstance() {
+        if (instance == nullptr) {
+            instance = new GBAPack();
+        }
+        return instance;
+    }
+
     bool GBAPack::loadFromMemory(const u8* data, u32 size) {
         LOG_DEBUG("Loading GameBoy Advance Pack from memory ...");
 
-        if (size < sizeof(FileHeader)) {
+        if (size < sizeof(Header)) {
             LOG_ERR("Not a valid GameBoy Advance Pack!");
             return false;
         }
 
-        FileHeader header;
-        memcpy(&header, data, sizeof(FileHeader));
+        Header header;
+        memcpy(&header, data, sizeof(Header));
 
         if (*reinterpret_cast<u32*>(header.signature) != GBRP_MAGIC) {
             LOG_ERR("Invalid signature in the GameBoy Advance Pack!");
@@ -75,19 +87,19 @@ namespace GBS {
             memcpy(&entry, indexPtr, sizeof(IndexEntry));
             indexPtr += sizeof(IndexEntry);
 
-            u8 type = (entry.type & TYPE_MASK) >> 13;
-            u16 id = entry.type & COUNT_MASK;
+            u32 entryType = (entry.id & TYPE_MASK) >> 28;
+            u32 id = entry.id & COUNT_MASK;
 
             LOG_DEBUG("  %d. id=%d, type=%s, offset=%lu, size=%lu", 
                 i + 1,
                 id,
-                RES_TYPES[type], 
+                RES_TYPES[entryType], 
                 entry.dataOffset, 
                 entry.dataSize
             );
 
-            indexTable[entry.type] = {
-                (EResourceType)type,
+            indexTable[entry.id] = {
+                (EResourceType)entryType,
                 id,
                 data + dataStartOffset + entry.dataOffset,
                 entry.dataSize
@@ -100,7 +112,7 @@ namespace GBS {
         u32 dataSize;
 
         // ----- BG Palette ----
-        u16 id = (BgPalette << 13) & 0xFFFF;
+        u32 id = RES_ID(Palette, 0);
         getResourceData(id, ptr, dataSize);
         DMA3COPY(
             ptr,
@@ -108,17 +120,19 @@ namespace GBS {
             dataSize / 2
         );
 
-        // ----- Spr Palette ----
-        id = (SprPalette << 13) & 0xFFFF;
-        getResourceData(id, ptr, dataSize);
-        DMA3COPY(
-            ptr,
-            SPRITE_PALETTE,
-            dataSize / 2
-        );
+        SetMode(MODE_0 | BG0_ENABLE);
 
-        // ----- Tile Set ----
-        id = (TileSet << 13) & 0xFFFF;
+        // // ----- Spr Palette ----
+        // id = (SprPalette << 13) & 0xFFFF;
+        // getResourceData(id, ptr, dataSize);
+        // DMA3COPY(
+        //     ptr,
+        //     SPRITE_PALETTE,
+        //     dataSize / 2
+        // );
+
+        // // ----- Tile Set ----
+        id = RES_ID(TileSet, 0);
         getResourceData(id, ptr, dataSize);
         DMA3COPY(
             ptr,
@@ -130,8 +144,8 @@ namespace GBS {
         REG_BG0HOFS = 0;
         REG_BG0VOFS = 0;
 
-        // // ----- Tile Map ----
-        id = (TileMap << 13) & 0xFFFF;
+        // // // ----- Tile Map ----
+        id = RES_ID(TileMap, 0);
         getResourceData(id, ptr, dataSize);
         DMA3COPY(
             ptr,
@@ -139,67 +153,65 @@ namespace GBS {
             dataSize
         );
 
-        // // ----- Sprites ----
-        id = (Sprite << 13) & 0xFFFF;
-        getResourceData(id, ptr, dataSize);
-        DMA3COPY(
-            ptr,
-            SPRITE_GFX,
-            dataSize / 2
-        );
+        // // // ----- Sprites ----
+        // id = (Sprite << 13) & 0xFFFF;
+        // getResourceData(id, ptr, dataSize);
+        // DMA3COPY(
+        //     ptr,
+        //     SPRITE_GFX,
+        //     dataSize / 2
+        // );
 
-        // Configure position and properties in OAM
-        OBJATTR* sprite = &OAM[0];
-        sprite->attr0 = ATTR0_COLOR_256 | ATTR0_SQUARE | ATTR0_TYPE_NORMAL | ATTR0_NORMAL | OBJ_Y(50);
-        sprite->attr1 = OBJ_SIZE(1) | OBJ_X(100); // 16x16 pixels
-        sprite->attr2 = OBJ_CHAR(0) | ATTR2_PRIORITY(0) | ATTR2_PALETTE(0); // Tile index and palette bank
+        // // Configure position and properties in OAM
+        // OBJATTR* sprite = &OAM[0];
+        // sprite->attr0 = ATTR0_COLOR_256 | ATTR0_SQUARE | ATTR0_TYPE_NORMAL | ATTR0_NORMAL | OBJ_Y(50);
+        // sprite->attr1 = OBJ_SIZE(1) | OBJ_X(100); // 16x16 pixels
+        // sprite->attr2 = OBJ_CHAR(0) | ATTR2_PRIORITY(0) | ATTR2_PALETTE(0); // Tile index and palette bank
 
-        id = ((Sprite << 13) | 1) & 0xFFFF;
-        getResourceData(id, ptr, dataSize);
-        DMA3COPY(
-            ptr,
-            SPRITE_GFX + 128,
-            dataSize / 2
-        );
+        // id = ((Sprite << 13) | 1) & 0xFFFF;
+        // getResourceData(id, ptr, dataSize);
+        // DMA3COPY(
+        //     ptr,
+        //     SPRITE_GFX + 128,
+        //     dataSize / 2
+        // );
 
-        id = ((Sprite << 13) | 2) & 0xFFFF;
-        getResourceData(id, ptr, dataSize);
-        DMA3COPY(
-            ptr,
-            SPRITE_GFX + 256,
-            dataSize / 2
-        );
+        // id = ((Sprite << 13) | 2) & 0xFFFF;
+        // getResourceData(id, ptr, dataSize);
+        // DMA3COPY(
+        //     ptr,
+        //     SPRITE_GFX + 256,
+        //     dataSize / 2
+        // );
 
-        id = ((Sprite << 13) | 3) & 0xFFFF;
-        getResourceData(id, ptr, dataSize);
-        DMA3COPY(
-            ptr,
-            SPRITE_GFX + 256 + 128,
-            dataSize / 2
-        );
+        // id = ((Sprite << 13) | 3) & 0xFFFF;
+        // getResourceData(id, ptr, dataSize);
+        // DMA3COPY(
+        //     ptr,
+        //     SPRITE_GFX + 256 + 128,
+        //     dataSize / 2
+        // );
 
         return true;
     }
 
-    void GBAPack::getResourceData(u16 resourceId, const u8*& data, u32& dataSize)
+    void GBAPack::getResourceData(u32 resourceId, const u8*& data, u32& dataSize)
     {
         if (indexTable.find(resourceId) == indexTable.end()) {
             data = NULL;
             dataSize = 0;
         }
 
-        u8 type = (indexTable[resourceId].type & TYPE_MASK) >> 13;
-        u16 id = indexTable[resourceId].type & COUNT_MASK;
+        u32 entryType = (resourceId & TYPE_MASK) >> 28;
 
         data = indexTable[resourceId].data;
         dataSize = indexTable[resourceId].size;
 
         u32 size = 0;
-        switch(type) {
-            case BgPalette: { size = sizeof(PaletteHeader);  } break;
+        switch(entryType) {
+            case Palette: { size = sizeof(PaletteHeader);  } break;
             case TileSet: { size = sizeof(TileSetHeader); } break;
 			case TileMap: { size = sizeof(TileMapHeader); } break;
-            case SprPalette: { size = sizeof(PaletteHeader); } break;
 			case Sprite: { size = sizeof(SpriteHeader); } break;
         }
 

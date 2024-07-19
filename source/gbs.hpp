@@ -1,0 +1,9 @@
+#pragma once
+#include "log.hpp"
+#include "engine.hpp"
+#include "reference.hpp"
+#include "object.hpp"
+#include "node.hpp"
+#include "resource.hpp"
+#include "scene.hpp"
+#include "background.hpp"

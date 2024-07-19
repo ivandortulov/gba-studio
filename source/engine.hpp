@@ -2,12 +2,6 @@
 
 #include <gba_types.h>
 
-#include "gba_pack.hpp"
-#include "reference.hpp"
-#include "renderer.hpp"
-#include "scene_tree.hpp"
-#include "resource_manager.hpp"
-
 namespace GBS {
     class Engine {
         public:
@@ -16,17 +10,9 @@ namespace GBS {
             ~Engine();
 
         public:
-            // void setCurrentScene(const RefPointer<Node>& scene);
-
-            void tick();
+            int run();
 
         private:
             bool isInitialized;
-
-            GBAPack* pack;
-
-            SceneTree* sceneTree;
-            ResourceManager* resourceManager;
-            Renderer* renderer;
     };
 }
