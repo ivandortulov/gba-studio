@@ -3,33 +3,42 @@
 #include <string>
 #include <vector>
 
-#define OBJECT(m_class, m_inherits) \
+#include "log.hpp"
+
+#define OBJECT(Class, Inherits) \
 private: \
-    void operator=(const m_class &p_rval) {} \
+    void operator=(const Class &rVal) {} \
 public: \
-    virtual const std::string getClass() const override{ \
-        return std::string(#m_class); \
+    static void* getClassPtrStatic() { \
+        static int basePtr; \
+        return &basePtr; \
     } \
-    virtual bool isClassPtr(void* p_ptr) const override { \
-      return getClassPtrStatic() == p_ptr; \
+    static const std::string getClassStatic() { \
+        return std::string(#Class); \
     } \
-    static inline const std::string getClassStatic() { \
-		return std::string(#m_class); \
-	} \
-    static inline void* getClassPtrStatic() { \
-      static int basePtr; \
-      return &basePtr; \
+    static void getInheritanceListStatic(std::vector<std::string>& inheritanceList) { \
+        Inherits::getInheritanceListStatic(inheritanceList); \
+        inheritanceList.push_back(#Class); \
     } \
-    static inline const std::string getParentClassStatic() { \
-		return m_inherits::getClassStatic(); \
-	} \
-    static void getInheritanceListStatic(std::vector<std::string> *p_inheritance_list) { \
-		m_inherits::getInheritanceListStatic(p_inheritance_list); \
-		p_inheritance_list->push_back(std::string(#m_class)); \
-	} \
-    static std::string inheritsStatic() { \
-		return std::string(#m_inherits); \
-	} \
+    static void getInheritanceListPtrStatic(std::vector<void*>& inheritanceList) { \
+        Inherits::getInheritanceListPtrStatic(inheritanceList); \
+        inheritanceList.push_back(getClassPtrStatic()); \
+    } \
+    virtual bool isClass(const std::string& classStr) const override { \
+        return (classStr == #Class); \
+    } \
+    virtual bool isClassPtr(void* ptr) const override { \
+        return getClassPtrStatic() == ptr; \
+    } \
+    virtual void getInheritanceList(std::vector<std::string>& inheritanceList) override { \
+        getInheritanceListStatic(inheritanceList); \
+    } \
+    virtual void getInheritancePtrList(std::vector<void*>& inheritanceList) override { \
+        getInheritanceListPtrStatic(inheritanceList); \
+    } \
+    virtual const std::string getClass() const override { \
+        return getClassStatic(); \
+    } \
     private:
 
 namespace GBS {
@@ -38,45 +47,66 @@ namespace GBS {
     public:
         virtual ~Object() { };
     public:
-        static inline void* getClassPtrStatic() {
+        static void* getClassPtrStatic() {
             static int basePtr;
             return &basePtr;
         }
 
-        static inline const std::string getClassStatic() {
+        static const std::string getClassStatic() {
             return std::string("Object");
         }
 
-        static void getInheritanceListStatic(std::vector<std::string>* p_inheritance_list) {
-            p_inheritance_list->push_back("Object");
+        static void getInheritanceListStatic(std::vector<std::string>& inheritanceList) {
+            inheritanceList.push_back("Object");
         }
 
-        virtual bool isClass(const std::string& p_class) const {
-            return (p_class == "Object");
+        static void getInheritanceListPtrStatic(std::vector<void*>& inheritanceList) {
+            inheritanceList.push_back(getClassPtrStatic());
         }
 
-        virtual bool isClassPtr(void* p_ptr) const {
-            return getClassPtrStatic() == p_ptr;
+        template <class T>
+        static T* cast_to(Object* object) {
+            if (!object) {
+                return nullptr;
+            }
+
+            if (object->isClassPtr(T::getClassPtrStatic())) {
+                return reinterpret_cast<T*>(object);
+            }
+
+            std::vector<void*> inheritanceListPtr;
+            object->getInheritancePtrList(inheritanceListPtr);
+            const void* ptrT = T::getClassPtrStatic();
+
+            for (const void* ptr : inheritanceListPtr) {
+                if (ptr == ptrT) {
+                    return reinterpret_cast<T*>(object);
+                }
+            }
+
+            return nullptr;
         }
 
-        virtual void getInheritanceList(std::vector<std::string>* p_inheritance_list) {
-            getInheritanceListStatic(p_inheritance_list);
+    public:
+        virtual bool isClass(const std::string& classStr) const {
+            return (classStr == "Object");
+        }
+
+        virtual bool isClassPtr(void* ptr) const {
+            return getClassPtrStatic() == ptr;
+        }
+
+        virtual void getInheritanceList(std::vector<std::string>& inheritanceList) {
+            getInheritanceListStatic(inheritanceList);
+        }
+
+        virtual void getInheritancePtrList(std::vector<void*>& inheritanceList) {
+            getInheritanceListPtrStatic(inheritanceList);
         }
 
         virtual const std::string getClass() const {
             return "Object";
         }
-
-        template <class T>
-        static T* cast_to(Object* p_object) {
-            if (p_object && p_object->isClassPtr(T::getClassPtrStatic())) {
-                return static_cast<T*>(p_object);
-            }
-            return nullptr;
-        }
-
-    protected:
-        std::string className;
     };
 
 }
