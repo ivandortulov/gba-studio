@@ -1,27 +1,30 @@
 #pragma once
 
 #define LOG_DEBUG(message, ...) \
-    GBS::Logger::log(GBS::LOG_DEBUG, message, ## __VA_ARGS__)
+    GBS::Logger::log(GBS::Debug, message, ## __VA_ARGS__)
 
 #define LOG_ERR(message, ...) \
-    GBS::Logger::log(GBS::LOG_ERROR, message, ## __VA_ARGS__)
+    GBS::Logger::log(GBS::Error, message, ## __VA_ARGS__)
+
+#define LOG_WARN(message, ...) \
+    GBS::Logger::log(GBS::Warning, message, ## __VA_ARGS__)
 
 namespace GBS {
 
     enum ELogLevel {
-        LOG_FATAL,
-        LOG_ERROR,
-        LOG_WARN,
-        LOG_INFO,
-        LOG_DEBUG,
+        Fatal,
+        Error,
+        Warning,
+        Info,
+        Debug,
     };
 
     class Logger {
-        public:
-            Logger();
-            ~Logger();
+    public:
+        Logger();
+        ~Logger();
 
-        public:
-            static void log(ELogLevel level, const char* ptr, ...);
+    public:
+        static void log(ELogLevel level, const char* ptr, ...);
     };
 }

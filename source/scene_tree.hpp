@@ -2,7 +2,7 @@
 
 namespace GBS {
     class SceneTree {
-        private:
-            static SceneTree *singleton;
+    private:
+        static SceneTree* singleton;
     };
 }

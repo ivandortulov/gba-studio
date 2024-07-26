@@ -4,11 +4,9 @@
 
 
 namespace GBS {
-    ResourceManager::ResourceManager(const GBAPack* pack) : pack(pack) {
+    ResourceManager* ResourceManager::instance = nullptr;
 
-    }
+    ResourceManager::ResourceManager() {
 
-    ResourceManager::~ResourceManager() {
-        
     }
 }

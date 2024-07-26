@@ -2,39 +2,41 @@
 
 #include <iostream>
 #include <memory.h>
-#include "log.hpp"
 
-#include <gba_video.h>
-#include <gba_interrupt.h>
-#include <gba_systemcalls.h>
-#include <gba_input.h>
-#include <gba_dma.h>
-#include <gba_sprites.h>
+#include "log.hpp"
+#include "macros.hpp"
+#include "types.hpp"
+
+#ifndef _MSC_VER
+# include <gba_video.h>
+# include <gba_interrupt.h>
+# include <gba_systemcalls.h>
+# include <gba_input.h>
+# include <gba_dma.h>
+# include <gba_sprites.h>
+#endif
 
 #include <vector>
 #include <string>
 
 #define GBRP_MAGIC 0x50524247
 
-#define RES_ID(Type, Count) \
-    ((Type) << 28) | ((Count) & 0x0FFFFFFF)
-
 namespace GBS {
     static const u8 TILE_SIZE = 8;
-    static const u32 TYPE_MASK = 0xF0000000; 
+    static const u32 TYPE_MASK = 0xF0000000;
     static const u32 COUNT_MASK = 0x0FFFFFFF;
 
     GBAPack* GBAPack::instance = nullptr;
 
     static const char* const RES_TYPES[] = {
-        "BgPalette",
-		"TileSet",
-		"TileMap",
-		"SprPalette",
-		"Sprite",
-		"Script",
-		"Scene",
-		"Sound"
+        "Palette",
+        "TileSet",
+        "TileMap",
+        "Sprite",
+        "Script",
+        "Scene",
+        "Sound",
+        "Config"
     };
 
     GBAPack::GBAPack()
@@ -77,8 +79,6 @@ namespace GBS {
         // Move the pointer to the start of the index table
         const u8* indexPtr =
             data + header.indexOffset;
-        const u32 dataStartOffset =
-            header.indexOffset + header.indexCount * sizeof(IndexEntry);
 
         IndexEntry entry;
 
@@ -87,21 +87,19 @@ namespace GBS {
             memcpy(&entry, indexPtr, sizeof(IndexEntry));
             indexPtr += sizeof(IndexEntry);
 
-            u32 entryType = (entry.id & TYPE_MASK) >> 28;
-            u32 id = entry.id & COUNT_MASK;
+            u32 entryType = RES_TYPE(entry.id);
+            u32 id = RES_ID(entry.id);
 
-            LOG_DEBUG("  %d. id=%d, type=%s, offset=%lu, size=%lu", 
+            LOG_DEBUG("  %d. id=%d, type=%s, offset=%lu, size=%lu",
                 i + 1,
                 id,
-                RES_TYPES[entryType], 
-                entry.dataOffset, 
+                RES_TYPES[entryType],
+                entry.dataOffset,
                 entry.dataSize
             );
 
             indexTable[entry.id] = {
-                (EResourceType)entryType,
-                id,
-                data + dataStartOffset + entry.dataOffset,
+                data + entry.dataOffset,
                 entry.dataSize
             };
         }
@@ -112,15 +110,17 @@ namespace GBS {
         u32 dataSize;
 
         // ----- BG Palette ----
-        u32 id = RES_ID(Palette, 0);
-        getResourceData(id, ptr, dataSize);
-        DMA3COPY(
-            ptr,
-            BG_PALETTE,
-            dataSize / 2
-        );
+        // u32 id = MAKE_RES_ID(Types::Palette, 0);
+        // getResourceData(id, ptr, dataSize);
+        // DMA3COPY(
+        //     ptr,
+        //     BG_PALETTE,
+        //     dataSize / 2
+        // );
 
-        SetMode(MODE_0 | BG0_ENABLE);
+#ifndef _MSC_VER
+        SetMode(MODE_0 | BG2_ENABLE | BG3_ENABLE);
+#endif
 
         // // ----- Spr Palette ----
         // id = (SprPalette << 13) & 0xFFFF;
@@ -132,26 +132,26 @@ namespace GBS {
         // );
 
         // // ----- Tile Set ----
-        id = RES_ID(TileSet, 0);
-        getResourceData(id, ptr, dataSize);
-        DMA3COPY(
-            ptr,
-            TILE_BASE_ADR(0),
-            dataSize / 2
-        );
+        // u32 id = MAKE_RES_ID(Types::TileSet, 0);
+        // getResourceData(id, ptr, dataSize);
+        // DMA3COPY(
+        //     ptr,
+        //     TILE_BASE_ADR(0),
+        //     dataSize / 2
+        // );
 
-        REG_BG0CNT = BG_256_COLOR | BG_SIZE_0 | BG_TILE_BASE(0) | BG_MAP_BASE(31);
-        REG_BG0HOFS = 0;
-        REG_BG0VOFS = 0;
+        // REG_BG0CNT = BG_256_COLOR | BG_SIZE_0 | BG_TILE_BASE(0) | BG_MAP_BASE(31);
+        // REG_BG0HOFS = 0;
+        // REG_BG0VOFS = 0;
 
         // // // ----- Tile Map ----
-        id = RES_ID(TileMap, 0);
-        getResourceData(id, ptr, dataSize);
-        DMA3COPY(
-            ptr,
-            MAP_BASE_ADR(31),
-            dataSize
-        );
+        // id = MAKE_RES_ID(Types::TileMap, 0);
+        // getResourceData(id, ptr, dataSize);
+        // DMA3COPY(
+        //     ptr,
+        //     MAP_BASE_ADR(31),
+        //     dataSize
+        // );
 
         // // // ----- Sprites ----
         // id = (Sprite << 13) & 0xFFFF;
@@ -198,21 +198,23 @@ namespace GBS {
     void GBAPack::getResourceData(u32 resourceId, const u8*& data, u32& dataSize)
     {
         if (indexTable.find(resourceId) == indexTable.end()) {
-            data = NULL;
+            data = nullptr;
             dataSize = 0;
+            return;
         }
 
-        u32 entryType = (resourceId & TYPE_MASK) >> 28;
+        u32 entryType = RES_TYPE(resourceId);
 
         data = indexTable[resourceId].data;
         dataSize = indexTable[resourceId].size;
 
         u32 size = 0;
-        switch(entryType) {
-            case Palette: { size = sizeof(PaletteHeader);  } break;
-            case TileSet: { size = sizeof(TileSetHeader); } break;
-			case TileMap: { size = sizeof(TileMapHeader); } break;
-			case Sprite: { size = sizeof(SpriteHeader); } break;
+        switch (entryType) {
+            // case Types::Palette: { size = sizeof(PaletteHeader);  } break;
+            // case Types::TileSet: { size = sizeof(TileSetHeader); } break;
+            // case Types::TileMap: { size = sizeof(TileMapHeader); } break;
+        case Types::Sprite: { size = sizeof(SpriteHeader); } break;
+        case Types::Scene: { size = 0; } break;
         }
 
         data += size;
@@ -221,95 +223,95 @@ namespace GBS {
 
     void GBAPack::updateScrollAndLoadTiles(s16 newScrollX, s16 newScrollY)
     {
-        const u16 mapWidth = 32;
-        const u16 mapHeight = 32;
+        // const u16 mapWidth = 32;
+        // const u16 mapHeight = 32;
 
-        // Calculate the maximum allowed scroll values
-        s16 maxScrollX = (mapWidth - loadedTilesWidth) * TILE_SIZE;  // mapWidth should be 32 and TILE_SIZE should be 8
-        s16 maxScrollY = (mapHeight - loadedTilesHeight) * TILE_SIZE; // mapHeight should also be 32
+        // // Calculate the maximum allowed scroll values
+        // s16 maxScrollX = (mapWidth - loadedTilesWidth) * TILE_SIZE;  // mapWidth should be 32 and TILE_SIZE should be 8
+        // s16 maxScrollY = (mapHeight - loadedTilesHeight) * TILE_SIZE; // mapHeight should also be 32
 
-        // Clamp new scroll values to prevent scrolling beyond the map edges
-        newScrollX = std::min(maxScrollX, std::max((s16)0, newScrollX));
-        newScrollY = std::min(maxScrollY, std::max((s16)0, newScrollY));
+        // // Clamp new scroll values to prevent scrolling beyond the map edges
+        // newScrollX = std::min(maxScrollX, std::max((s16)0, newScrollX));
+        // newScrollY = std::min(maxScrollY, std::max((s16)0, newScrollY));
 
-        // Convert pixel scroll to tile indices
-        s16 newStartTileX = newScrollX / TILE_SIZE;
-        s16 newStartTileY = newScrollY / TILE_SIZE;
+        // // Convert pixel scroll to tile indices
+        // s16 newStartTileX = newScrollX / TILE_SIZE;
+        // s16 newStartTileY = newScrollY / TILE_SIZE;
 
-        // Calculate changes in scroll position in terms of tiles
-        int deltaX = newStartTileX - loadedTilesStartX;
-        int deltaY = newStartTileY - loadedTilesStartY;
+        // // Calculate changes in scroll position in terms of tiles
+        // int deltaX = newStartTileX - loadedTilesStartX;
+        // int deltaY = newStartTileY - loadedTilesStartY;
 
-        if (deltaX != 0 || deltaY != 0)
-        {
-            // Update the portion of the map that is loaded based on scroll direction
-            if (deltaX > 0)
-            {
-                // Scroll right, load new column(s) on the right edge
-                loadTilesVertical(newStartTileX + loadedTilesWidth - 1, deltaY, deltaY + loadedTilesHeight - 1, true);
-            }
-            else if (deltaX < 0)
-            {
-                // Scroll left, load new column(s) on the left edge
-                loadTilesVertical(newStartTileX, deltaY, deltaY + loadedTilesHeight - 1, false);
-            }
+        // if (deltaX != 0 || deltaY != 0)
+        // {
+        //     // Update the portion of the map that is loaded based on scroll direction
+        //     if (deltaX > 0)
+        //     {
+        //         // Scroll right, load new column(s) on the right edge
+        //         loadTilesVertical(newStartTileX + loadedTilesWidth - 1, deltaY, deltaY + loadedTilesHeight - 1, true);
+        //     }
+        //     else if (deltaX < 0)
+        //     {
+        //         // Scroll left, load new column(s) on the left edge
+        //         loadTilesVertical(newStartTileX, deltaY, deltaY + loadedTilesHeight - 1, false);
+        //     }
 
-            if (deltaY > 0)
-            {
-                // Scroll down, load new row(s) at the bottom
-                loadTilesHorizontal(deltaX, deltaX + loadedTilesWidth - 1, newStartTileY + loadedTilesHeight - 1, true);
-            }
-            else if (deltaY < 0)
-            {
-                // Scroll up, load new row(s) at the top
-                loadTilesHorizontal(deltaX, deltaX + loadedTilesWidth - 1, newStartTileY, false);
-            }
+        //     if (deltaY > 0)
+        //     {
+        //         // Scroll down, load new row(s) at the bottom
+        //         loadTilesHorizontal(deltaX, deltaX + loadedTilesWidth - 1, newStartTileY + loadedTilesHeight - 1, true);
+        //     }
+        //     else if (deltaY < 0)
+        //     {
+        //         // Scroll up, load new row(s) at the top
+        //         loadTilesHorizontal(deltaX, deltaX + loadedTilesWidth - 1, newStartTileY, false);
+        //     }
 
-            // Update loaded tiles tracking
-            loadedTilesStartX = newStartTileX;
-            loadedTilesStartY = newStartTileY;
-        }
+        //     // Update loaded tiles tracking
+        //     loadedTilesStartX = newStartTileX;
+        //     loadedTilesStartY = newStartTileY;
+        // }
 
-        BG_OFFSET[0].x = newScrollX;
-        BG_OFFSET[0].y = newScrollY;
+        // BG_OFFSET[0].x = newScrollX;
+        // BG_OFFSET[0].y = newScrollY;
     }
 
     void GBAPack::loadTilesVertical(u16 startX, u16 startY, u16 endY, bool rightEdge)
     {
-        u16 vramOffset = rightEdge ? (loadedTilesWidth - 1) : 0;
-        u32 tileIndex;
-        u16* tileDataPtr;
+        // u16 vramOffset = rightEdge ? (loadedTilesWidth - 1) : 0;
+        // u32 tileIndex;
+        // u16* tileDataPtr;
 
-        for (u16 y = startY; y <= endY; y++)
-        {
-            tileIndex = y * 32 + startX; // Calculate index in the full tile map
-            tileDataPtr = (u16*)(indexTable[TileMap].data + tileIndex * TILE_SIZE); // Pointer to the tile data
+        // for (u16 y = startY; y <= endY; y++)
+        // {
+        //     tileIndex = y * 32 + startX; // Calculate index in the full tile map
+        //     tileDataPtr = (u16*)(indexTable[Types::TileMap].data + tileIndex * TILE_SIZE); // Pointer to the tile data
 
-            // Calculate the VRAM address to load the tile into
-            u16* vramAddress = ((u16*)TILE_BASE_ADR(0) + (y * 32 + vramOffset) * TILE_SIZE);
+        //     // Calculate the VRAM address to load the tile into
+        //     u16* vramAddress = ((u16*)TILE_BASE_ADR(0) + (y * 32 + vramOffset) * TILE_SIZE);
 
-            // Copy the tile data into VRAM
-            DMA3COPY(tileDataPtr, vramAddress, TILE_SIZE / 2);
-        }
+        //     // Copy the tile data into VRAM
+        //     DMA3COPY(tileDataPtr, vramAddress, TILE_SIZE / 2);
+        // }
     }
 
     void GBAPack::loadTilesHorizontal(u16 startX, u16 endX, u16 startY, bool bottomEdge)
     {
-        // Determine the VRAM offset for horizontal tile loading
-        u16 vramOffset = bottomEdge ? (loadedTilesHeight - 1) : 0;
-        u32 tileIndex;
-        u16* tileDataPtr;
+        // // Determine the VRAM offset for horizontal tile loading
+        // u16 vramOffset = bottomEdge ? (loadedTilesHeight - 1) : 0;
+        // u32 tileIndex;
+        // u16* tileDataPtr;
 
-        for (u16 x = startX; x <= endX; x++) {
-            tileIndex = startY * 32 + x; // Calculate index in the full tile map
-            tileDataPtr = (u16*)(indexTable[TileMap].data + tileIndex * TILE_SIZE); // Pointer to the tile data
+        // for (u16 x = startX; x <= endX; x++) {
+        //     tileIndex = startY * 32 + x; // Calculate index in the full tile map
+        //     tileDataPtr = (u16*)(indexTable[Types::TileMap].data + tileIndex * TILE_SIZE); // Pointer to the tile data
 
-            // Calculate the VRAM address to load the tile into
-            u16* vramAddress = ((u16*)TILE_BASE_ADR(0) + (vramOffset * 32 + x) * TILE_SIZE);
+        //     // Calculate the VRAM address to load the tile into
+        //     u16* vramAddress = ((u16*)TILE_BASE_ADR(0) + (vramOffset * 32 + x) * TILE_SIZE);
 
-            // Copy the tile data into VRAM
-            DMA3COPY(tileDataPtr, vramAddress, TILE_SIZE / 2);
-        }
+        //     // Copy the tile data into VRAM
+        //     DMA3COPY(tileDataPtr, vramAddress, TILE_SIZE / 2);
+        // }
     }
 
 }

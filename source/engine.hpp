@@ -4,15 +4,15 @@
 
 namespace GBS {
     class Engine {
-        public:
-            explicit Engine(const u8* pckPtr, const u32 pckSize);
+    public:
+        explicit Engine(const u8* pckPtr, const u32 pckSize);
 
-            ~Engine();
+        ~Engine();
 
-        public:
-            int run();
+    public:
+        int run();
 
-        private:
-            bool isInitialized;
+    private:
+        bool isInitialized;
     };
 }

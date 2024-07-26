@@ -10,38 +10,46 @@
 #define REG_DEBUG_STRING (char *)0x4FFF600
 
 namespace GBS {
-    static Logger sLogger;
+        static Logger sLogger;
 
-    // static void mgbaPrintf(ELogLevel level, const char* ptr, ...) {
-    //     va_list args;
-    //     va_start(args, ptr);
-    //     vsprintf(REG_DEBUG_STRING, ptr, args);
-    //     va_end(args);
-    //     *REG_DEBUG_FLAGS = ((int)level & 0x7) | 0x100;
-    // }
+        // static void mgbaPrintf(ELogLevel level, const char* ptr, ...) {
+        //     va_list args;
+        //     va_start(args, ptr);
+        //     vsprintf(REG_DEBUG_STRING, ptr, args);
+        //     va_end(args);
+        //     *REG_DEBUG_FLAGS = ((int)level & 0x7) | 0x100;
+        // }
 
-    // static u8 mgbaOpen() {
-    //     *REG_DEBUG_ENABLE = 0xC0DE;
-    //     return *REG_DEBUG_ENABLE == 0x1DEA;
-    // }
+        // static u8 mgbaOpen() {
+        //     *REG_DEBUG_ENABLE = 0xC0DE;
+        //     return *REG_DEBUG_ENABLE == 0x1DEA;
+        // }
 
-    // static void mgbaClose() {
-    //     *REG_DEBUG_ENABLE = 0;
-    // }
+        // static void mgbaClose() {
+        //     *REG_DEBUG_ENABLE = 0;
+        // }
 
-    Logger::Logger() {
-        *REG_DEBUG_ENABLE = 0xC0DE;
-    }
+        Logger::Logger() {
+#ifndef _MSC_VER
+                * REG_DEBUG_ENABLE = 0xC0DE;
+#endif
+        }
 
-    Logger::~Logger() {
-        *REG_DEBUG_ENABLE = 0;
-    }
+        Logger::~Logger() {
+#ifndef _MSC_VER
+                * REG_DEBUG_ENABLE = 0;
+#endif
+        }
 
-    void Logger::log(ELogLevel level, const char* ptr, ...) {
-        va_list args;
-        va_start(args, ptr);
-        vsprintf(REG_DEBUG_STRING, ptr, args);
-        va_end(args);
-        *REG_DEBUG_FLAGS = ((int)level & 0x7) | 0x100;
-    }
+        void Logger::log(ELogLevel level, const char* ptr, ...) {
+                va_list args;
+                va_start(args, ptr);
+#ifndef _MSC_VER
+                vsprintf(REG_DEBUG_STRING, ptr, args);
+#endif
+                va_end(args);
+#ifndef _MSC_VER
+                * REG_DEBUG_FLAGS = ((int)level & 0x7) | 0x100;
+#endif
+        }
 }

@@ -5,24 +5,19 @@
 
 #include <map>
 
+#include "macros.hpp"
+
 #define MAGIC_GBRP "GBRP"
 
 namespace GBS
 {
 	class GBAPack {
-		enum EResourceType {
-			Palette,
-			TileSet,
-			TileMap,
-			Sprite,
-			Script,
-			Scene,
-			Sound,
 
-			NumResourceTypes
-		};
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+#endif
 
-		struct __attribute__((packed)) Header{
+		struct PACKED Header {
 			char signature[4];
 			u16 version;
 			u32 indexOffset;
@@ -33,34 +28,37 @@ namespace GBS
 			u32 id;
 			u32 dataOffset;
 			u32 dataSize;
-		} __attribute__((packed)) IndexEntry;
+		} PACKED IndexEntry;
 
 		struct IndexTableEntry {
-			EResourceType type;
-			u32 id;
 			const u8* data;
 			u32 size;
 		};
 
-		struct __attribute__((packed)) PaletteHeader {
-			u16 numColors;
+		struct PACKED PaletteHeader {
+			u8 background;
+			u8 numColors;
 		};
 
-		struct __attribute__((packed)) TileSetHeader {
+		struct PACKED TileSetHeader {
 			u32 paletteId;
 			u16 numTiles;
 		};
 
-		struct __attribute__((packed)) TileMapHeader {
+		struct PACKED TileMapHeader {
 			u32 tileSetId;
 			u16 width;
 			u16 height;
 		};
 
-		struct __attribute__((packed)) SpriteHeader {
+		struct PACKED SpriteHeader {
 			u8 size;
 			u8 palette;
 		};
+
+#ifdef _MSC_VER
+#pragma pack(pop)
+#endif
 
 	public:
 		static GBAPack* getInstance();
@@ -79,6 +77,7 @@ namespace GBS
 		static GBAPack* instance;
 
 	private:
+		const u8* dataStart;
 		std::map<u32, IndexTableEntry> indexTable;
 
 		int loadedTilesStartX;

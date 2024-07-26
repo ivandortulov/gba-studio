@@ -6,11 +6,11 @@ namespace GBS {
     class Node : public Reference {
         OBJECT(Node, Reference)
 
-        public:
-            void addChild(const RefPointer<Node>& child);
-            void removeChild(const RefPointer<Node>& child);
+    public:
+        void addChild(const RefPointer<Node>& child);
+        void removeChild(const RefPointer<Node>& child);
 
-        protected:
-            std::vector<RefPointer<Node>> children;
+    protected:
+        std::vector<RefPointer<Node>> children;
     };
 }
