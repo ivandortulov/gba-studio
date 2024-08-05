@@ -1,7 +1,7 @@
 #pragma once
 
-#include "reference.hpp"
-#include "resource.hpp"
+#include "core/reference.hpp"
+#include "resources/resource.hpp"
 
 #include <map>
 #include <string>

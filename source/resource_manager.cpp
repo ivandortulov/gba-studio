@@ -1,6 +1,6 @@
 #include "resource_manager.hpp"
 
-#include "gba_pack.hpp"
+#include "resources/gba_pack.hpp"
 
 
 namespace GBS {
